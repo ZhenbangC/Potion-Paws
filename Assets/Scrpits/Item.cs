@@ -13,9 +13,14 @@ public class Item : MonoBehaviour
     public InteractionType interactType;
     public ItemType type;
 
+    [Header("道具名称（用于堆叠识别）")]
+    public string itemName; // 统一命名识别
+
+    public Sprite icon; // 用于UI显示
+
     [Header("Description")]
     [TextArea(2, 5)]
-    public string descriptionText; 
+    public string descriptionText;
 
     [Header("Custom Events")]
     public UnityEvent customEvent;
@@ -25,21 +30,14 @@ public class Item : MonoBehaviour
     {
         Collider2D collider = GetComponent<Collider2D>();
         if (collider != null)
-        {
             collider.isTrigger = true;
-        }
         gameObject.layer = 7;
     }
 
     public void Interact()
     {
         InteractionSystem interactionSystem = FindObjectOfType<InteractionSystem>();
-
-        if (interactionSystem == null)
-        {
-            Debug.LogError("InteractionSystem not found in the scene!");
-            return;
-        }
+        if (interactionSystem == null) return;
 
         switch (interactType)
         {
@@ -47,20 +45,8 @@ public class Item : MonoBehaviour
                 InventorySystem inventorySystem = FindObjectOfType<InventorySystem>();
                 if (inventorySystem != null)
                 {
-                    inventorySystem.PickUp(gameObject);
-
-                  
-                    int index = inventorySystem.items.IndexOf(gameObject);
-                    if (index >= 0)
-                    {
-                        inventorySystem.ShowDescription(index);
-                    }
-
+                    inventorySystem.PickUp(this); // 改为传递Item
                     gameObject.SetActive(false);
-                }
-                else
-                {
-                    Debug.LogError("InventorySystem not found in the scene!");
                 }
                 break;
 
@@ -71,20 +57,8 @@ public class Item : MonoBehaviour
             case InteractionType.GrabDrop:
                 interactionSystem.GrabDrop();
                 break;
-
-            default:
-                Debug.LogWarning("No valid interaction type set for: " + gameObject.name);
-                break;
         }
 
-       
-        if (customEvent != null)
-        {
-            customEvent.Invoke();
-        }
-        else
-        {
-            Debug.LogWarning("Custom event is null on: " + gameObject.name);
-        }
+        customEvent?.Invoke();
     }
 }

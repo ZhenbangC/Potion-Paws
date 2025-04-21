@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Drawing;
 using UnityEngine;
 
 public class GridPosition : MonoBehaviour
@@ -9,35 +8,33 @@ public class GridPosition : MonoBehaviour
     public const float tileSizewidth = 30;
     public const float tileSizeheight = 30;
 
-    InvestoryItem[,] investoryItemSlot;
+    InventoryItem[,] inventoryItemSlot;
 
-    [SerializeField] int gridSizeWidth=10;
-    [SerializeField] int gridSizeHeight=10;
+    [SerializeField] int gridSizeWidth = 5;
+    [SerializeField] int gridSizeHeight = 5;
 
     RectTransform rectTransform;
-    // Start is called before the first frame update
+
     void Start()
     {
         rectTransform = GetComponent<RectTransform>();
         Init(gridSizeWidth, gridSizeHeight);
-
-
     }
 
     Vector2 positionOnTheGrid = new Vector2();
     Vector2Int tileGridPosition = new Vector2Int();
 
-    private void Init(int width,int height)
+    private void Init(int width, int height)
     {
-        investoryItemSlot = new InvestoryItem[width,height];
-        Vector2 size = new Vector2(width*tileSizeheight,height*tileSizeheight);
+        inventoryItemSlot = new InventoryItem[width, height];
+        Vector2 size = new Vector2(width * tileSizeheight, height * tileSizeheight);
         rectTransform.sizeDelta = size;
     }
 
-    public Vector2Int GetGridPosition(Vector2 mousPosition)
+    public Vector2Int GetGridPosition(Vector2 mousePosition)
     {
-        positionOnTheGrid.x = mousPosition.x - rectTransform.position.x;
-        positionOnTheGrid.y = rectTransform.position.y - mousPosition.y;
+        positionOnTheGrid.x = mousePosition.x - rectTransform.position.x;
+        positionOnTheGrid.y = rectTransform.position.y - mousePosition.y;
 
         tileGridPosition.x = (int)(positionOnTheGrid.x / tileSizewidth);
         tileGridPosition.y = (int)(positionOnTheGrid.y / tileSizeheight);
@@ -45,170 +42,151 @@ public class GridPosition : MonoBehaviour
         return tileGridPosition;
     }
 
-    public bool PlaceItem(InvestoryItem investoryItem, int posX, int posY, ref InvestoryItem overLapItem)
+    public bool PlaceItem(InventoryItem inventoryItem, int posX, int posY, ref InventoryItem overLapItem)
     {
-        if (boundryCheck(posX, posY, investoryItem.itemData.width, investoryItem.itemData.height) == false)
+        if (!BoundaryCheck(posX, posY, inventoryItem.itemData.width, inventoryItem.itemData.height))
             return false;
 
-        if (overLapCheck(posX, posY, investoryItem.itemData.width, investoryItem.itemData.height, ref overLapItem) == false)
+        if (!OverlapCheck(posX, posY, inventoryItem.itemData.width, inventoryItem.itemData.height, ref overLapItem))
         {
-            //Debug.Log("lap");
             overLapItem = null;
             return false;
         }
 
         if (overLapItem != null)
         {
-            cleanGrid(overLapItem);
+            CleanGrid(overLapItem);
         }
 
-        PlaceItem(investoryItem, posX, posY);
-
+        PlaceItem(inventoryItem, posX, posY);
         return true;
     }
 
-    public void PlaceItem(InvestoryItem investoryItem, int posX, int posY)
+    public void PlaceItem(InventoryItem inventoryItem, int posX, int posY)
     {
-        RectTransform rectTransform = investoryItem.GetComponent<RectTransform>();
-        rectTransform.SetParent(this.rectTransform);
+        RectTransform itemRect = inventoryItem.GetComponent<RectTransform>();
+        itemRect.SetParent(this.rectTransform);
 
-        for (int x = 0; x < investoryItem.itemData.width; x++)
+        for (int x = 0; x < inventoryItem.itemData.width; x++)
         {
-            for (int y = 0; y < investoryItem.itemData.height; y++)
+            for (int y = 0; y < inventoryItem.itemData.height; y++)
             {
-                investoryItemSlot[posX + x, posY + y] = investoryItem;
+                inventoryItemSlot[posX + x, posY + y] = inventoryItem;
             }
         }
 
-        investoryItem.onGridPositionX = posX;
-        investoryItem.onGridPositionY = posY;
-        Vector2 position = CalculatePosOnGrid(investoryItem, posX, posY);
-        //position.x = posX * tileSizewidth ;
-        //position.y = -(posY * tileSizeheight);
-        rectTransform.localPosition = position;
+        inventoryItem.onGridPositionX = posX;
+        inventoryItem.onGridPositionY = posY;
+
+        Vector2 position = CalculatePosOnGrid(inventoryItem, posX, posY);
+        itemRect.localPosition = position;
     }
 
-    public Vector2 CalculatePosOnGrid(InvestoryItem investoryItem, int posX, int posY)
+    public Vector2 CalculatePosOnGrid(InventoryItem inventoryItem, int posX, int posY)
     {
         Vector2 position = new Vector2();
-        position.x = posX * tileSizewidth + tileSizewidth * investoryItem.itemData.width / 2;
-        position.y = -(posY * tileSizeheight + tileSizeheight * investoryItem.itemData.height / 2);
+        position.x = posX * tileSizewidth + tileSizewidth * inventoryItem.itemData.width / 2;
+        position.y = -(posY * tileSizeheight + tileSizeheight * inventoryItem.itemData.height / 2);
         return position;
     }
 
-    private bool overLapCheck(int posX, int posY, int width, int height, ref InvestoryItem overLapItem)
+    private bool OverlapCheck(int posX, int posY, int width, int height, ref InventoryItem overLapItem)
     {
-        //Debug.Log(posX); Debug.Log(posY); Debug.Log(width); Debug.Log(height);
-        for (int x =0;x<width;x++)
+        for (int x = 0; x < width; x++)
         {
-            for (int y =0;y<height;y++)
+            for (int y = 0; y < height; y++)
             {
-                if (investoryItemSlot[posX+x,posY+y]!=null)
+                InventoryItem item = inventoryItemSlot[posX + x, posY + y];
+                if (item != null)
                 {
                     if (overLapItem == null)
                     {
-                        overLapItem = investoryItemSlot[posX+x,posY+y];
-                       // Debug.Log(overLapItem);
+                        overLapItem = item;
                     }
-
-                    else
+                    else if (overLapItem != item)
                     {
-                        if (overLapItem != investoryItemSlot[posX + x, posY + y])
-                            return false;
+                        return false;
                     }
                 }
-                
             }
         }
-
         return true;
     }
 
     private bool CheckAvailableSpace(int posX, int posY, int width, int height)
     {
-        //Debug.Log(posX); Debug.Log(posY); Debug.Log(width); Debug.Log(height);
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
             {
-                if (investoryItemSlot[posX + x, posY + y] != null)
+                if (inventoryItemSlot[posX + x, posY + y] != null)
                 {
-                            return false;
+                    return false;
                 }
-
             }
         }
-
         return true;
     }
 
-    public InvestoryItem PickUpItem(int x , int y)
+    public InventoryItem PickUpItem(int x, int y)
     {
-        InvestoryItem toReturn = investoryItemSlot[x, y];
-
+        InventoryItem toReturn = inventoryItemSlot[x, y];
         if (toReturn == null) return null;
 
-        cleanGrid(toReturn);
-
+        CleanGrid(toReturn);
         return toReturn;
     }
 
-    private void cleanGrid(InvestoryItem toReturn)
+    private void CleanGrid(InventoryItem toReturn)
     {
         for (int ix = 0; ix < toReturn.itemData.width; ix++)
         {
             for (int iy = 0; iy < toReturn.itemData.height; iy++)
             {
-                investoryItemSlot[toReturn.onGridPositionX + ix, toReturn.onGridPositionY + iy] = null;
+                inventoryItemSlot[toReturn.onGridPositionX + ix, toReturn.onGridPositionY + iy] = null;
             }
         }
     }
 
-    bool positionCheck(int posX, int posY)
+    bool PositionCheck(int posX, int posY)
     {
-        if(posX < 0 || posY<0) return false;
-
-        if (posX>=gridSizeWidth|| posY>=gridSizeHeight) return false;
-
-        return true;
+        return !(posX < 0 || posY < 0 || posX >= gridSizeWidth || posY >= gridSizeHeight);
     }
 
-    public bool boundryCheck(int posX,int posY,int width,int height)
+    public bool BoundaryCheck(int posX, int posY, int width, int height)
     {
-        if (positionCheck(posX, posY) == false) return false;
-        posX += width-1; posY += height-1;
-        if (positionCheck(posX, posY) == false) return false;
-
-        return true;
+        if (!PositionCheck(posX, posY)) return false;
+        posX += width - 1;
+        posY += height - 1;
+        return PositionCheck(posX, posY);
     }
 
-
-    // Update is called once per frame
     void Update()
     {
         
     }
 
-    internal InvestoryItem GetItem(int x, int y)
+    internal InventoryItem GetItem(int x, int y)
     {
-        return investoryItemSlot[x,y];
+        return inventoryItemSlot[x, y];
     }
 
-    public Vector2Int? FindSpaceForObject(InvestoryItem itemToInsert)
+    public Vector2Int? FindSpaceForObject(InventoryItem itemToInsert)
     {
-        int height = gridSizeHeight - itemToInsert.itemData.height +1;
-        int width = gridSizeWidth - itemToInsert.itemData.width+1;
+        int height = gridSizeHeight - itemToInsert.itemData.height + 1;
+        int width = gridSizeWidth - itemToInsert.itemData.width + 1;
 
-        for(int y=0;y<height;y++)
+        for (int y = 0; y < height; y++)
         {
-            for(int x=0;x<width;x++)
+            for (int x = 0; x < width; x++)
             {
-                if(CheckAvailableSpace(x,y,itemToInsert.itemData.width,itemToInsert.itemData.height) == true)
+                if (CheckAvailableSpace(x, y, itemToInsert.itemData.width, itemToInsert.itemData.height))
                 {
-                    return new Vector2Int(x,y);
+                    return new Vector2Int(x, y);
                 }
             }
         }
+
         return null;
     }
 }

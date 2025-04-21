@@ -1,35 +1,58 @@
 using System.Collections;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class LevelMove : MonoBehaviour
 {
+    [Header("切换的目标场景 Index")]
     public int sceneBuildIndex;
-    // Start is called before the first frame update
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        print("Trigger Entered");
 
-        if (other.tag == "Player")
+    [Header("是否需要按键触发切换")]
+    public bool useInteractionKey = true;
+
+    [Header("按键提示 UI")]
+    public GameObject interactHint;
+
+    private bool playerInRange = false;
+
+    void Update()
+    {
+        if (useInteractionKey && playerInRange && Input.GetKeyDown(KeyCode.E))
         {
-            print("Switching Scene to" + sceneBuildIndex);
-            SceneManager.LoadScene(sceneBuildIndex, LoadSceneMode.Single);
+            SwitchScene();
         }
     }
-    private IEnumerator RepositionPlayer()
-    {
-        yield return new WaitForSeconds(0.1f); 
-        GameObject spawnPoint = GameObject.Find("SpawnPoint");
 
-        if (spawnPoint != null)
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (!other.CompareTag("Player")) return;
+
+        playerInRange = true;
+
+        if (!useInteractionKey)
         {
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
-            {
-                player.transform.position = spawnPoint.transform.position;
-            }
+            SwitchScene();
         }
+        else
+        {
+            if (interactHint != null)
+                interactHint.SetActive(true); // 显示提示
+        }
+    }
+
+    private void OnTriggerExit2D(Collider2D other)
+    {
+        if (!other.CompareTag("Player")) return;
+
+        playerInRange = false;
+
+        if (interactHint != null)
+            interactHint.SetActive(false); // 隐藏提示
+    }
+
+    void SwitchScene()
+    {
+        Debug.Log("切换到场景 Index：" + sceneBuildIndex);
+        SceneManager.LoadScene(sceneBuildIndex, LoadSceneMode.Single);
     }
 }

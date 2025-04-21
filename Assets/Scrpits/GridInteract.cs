@@ -4,29 +4,26 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(GridPosition))]
-public class GridInteract : MonoBehaviour,IPointerEnterHandler,IPointerExitHandler
+public class GridInteract : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
-    investeroyController InvesteroyController;
+    InventoryController inventoryController;
     GridPosition gridPosition;
 
-    // Start is called before the first frame update
     private void Awake()
     {
         gridPosition = GetComponent<GridPosition>();
-        InvesteroyController = FindObjectOfType(typeof(investeroyController)) as investeroyController;
+        inventoryController = FindObjectOfType(typeof(InventoryController)) as InventoryController;
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
         Debug.Log("Pointer Enter");
-        InvesteroyController.GridPosition = gridPosition;
+        inventoryController.GridPosition = gridPosition;
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         Debug.Log("Pointer Exit");
-        InvesteroyController.GridPosition = null;
+        inventoryController.GridPosition = null;
     }
-
-
 }

@@ -13,8 +13,8 @@ TagManager:
   - UI
   - Ground
   - Item
-  - 
-  - 
+  - Wall
+  - Background
   - 
   - 
   - 
@@ -40,4 +40,10 @@ TagManager:
   m_SortingLayers:
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: Plantes/House
+    uniqueID: 186369461
+    locked: 0
+  - name: Player
+    uniqueID: 2598112597
     locked: 0

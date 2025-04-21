@@ -1,136 +1,158 @@
-using System.Collections;
-using System.Collections.Generic;
+
 using UnityEngine;
 
 public class Playermovement : MonoBehaviour
 {
+
     [Header("移动参数")]
-    public float moveSpeed = 8f;
-    public float acceleration = 10f;
-    public float deceleration = 10f;
+    public float moveSpeed = 5f;
 
     [Header("跳跃参数")]
-    public float jumpForce = 12f;
-    public LayerMask groundLayer;
+    public float jumpForce = 10f;
+    public int maxJumps = 2;
+    private int availableJumps;
+
+    [Header("地面检测")]
     public Transform groundCheck;
     public float groundCheckRadius = 0.2f;
-
-    [Header("墙体互动参数")]
-    public float wallSlideSpeed = 3f;
-    public float wallPushForce = 2f;
-    public float wallCheckDistance = 0.5f;
-    public float wallStickTime = 0.1f;
-
-    private Rigidbody2D rb;
-    private float moveInput;
+    public LayerMask groundLayer;
     private bool isGrounded;
+
+    [Header("墙壁检测")]
+    public Transform wallCheck;
+    public float wallCheckDistance = 0.5f;
     private bool isTouchingWall;
-    private float velocityXSmoothing;
-    private Vector3 initialScale;
-    private float wallDirection;
-    private float wallStickCounter;
+    public LayerMask wallLayer;
+
+    [Header("墙滑相关")]
+    public float wallSlideSpeed = 2f;
     private bool isWallSliding;
 
-    private InventorySystem inventory;
-    private InteractionSystem interaction;
-    public bool isDead = false; // 可按需启用
+    [Header("跳跃容错")]
+    public float coyoteTime = 0.2f;
+    private float coyoteTimeCounter;
+
+    [Header("组件引用")]
+    private Rigidbody2D rb;
+    private Animator animator;
+    private SpriteRenderer spriteRenderer;
+
+    [Header("墙跳限制")]
+    public float wallJumpCooldown = 0.3f;
+    private float wallJumpCooldownTimer = 0f;
+
+    private float moveInput;
+    private int facingDirection = 1;
+    private int lastWallJumpDirection = 0;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
-        initialScale = transform.localScale;
-
-        inventory = FindObjectOfType<InventorySystem>();
-        interaction = FindObjectOfType<InteractionSystem>();
+        animator = GetComponent<Animator>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        availableJumps = maxJumps;
     }
 
     void Update()
     {
-        if (!CanMoveOrInteract())
-        {
-            moveInput = 0f;
-            return;
-        }
+        if (wallJumpCooldownTimer > 0f)
+            wallJumpCooldownTimer -= Time.deltaTime;
 
         moveInput = Input.GetAxisRaw("Horizontal");
+        
+        animator.SetFloat("yVelocity", rb.velocity.y);
 
         CheckGrounded();
-        CheckWall();
-        HandleJump();
+        HandleCoyoteTime();
         FlipCharacter();
+        CheckWall();
+        HandleWallSlide();
+        HandleJump();
+        UpdateAnimator();
     }
 
     void FixedUpdate()
     {
-        if (!CanMoveOrInteract()) return;
-
-        HandleMovement();
-        HandleWallSlide();
-    }
-
-    bool CanMoveOrInteract()
-    {
-        bool can = true;
-
-        if (interaction != null && interaction.isExamining)
-            can = false;
-        if (inventory != null && inventory.isOpen)
-            can = false;
-        if (isDead)
-            can = false;
-
-        return can;
+        if (!isWallSliding)
+            rb.velocity = new Vector2(moveInput * moveSpeed, rb.velocity.y);
+        else
+            rb.velocity = new Vector2(moveInput * moveSpeed * 0.5f, rb.velocity.y);
     }
 
     void CheckGrounded()
     {
-        RaycastHit2D hit = Physics2D.Raycast(
-            groundCheck.position,
-            Vector2.down,
-            groundCheckRadius,
-            groundLayer
-        );
-        isGrounded = hit.collider != null && hit.normal.y > 0.7f;
+        isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
+        if (isGrounded)
+            availableJumps = maxJumps;
+
+
+        animator.SetBool("Jump", !isGrounded);
     }
 
     void CheckWall()
     {
-        Vector2 checkDirection = new Vector2(transform.localScale.x > 0 ? 1 : -1, 0);
-        RaycastHit2D hit = Physics2D.Raycast(
-            transform.position,
-            checkDirection,
-            wallCheckDistance,
-            groundLayer
-        );
+        bool wasTouchingWall = isTouchingWall;
 
-        isTouchingWall = hit.collider != null && !isGrounded;
-        wallDirection = checkDirection.x;
+        isTouchingWall = Physics2D.Raycast(wallCheck.position, Vector2.right * facingDirection, wallCheckDistance, wallLayer);
 
-        if (isTouchingWall)
+        
+        if (wasTouchingWall && !isTouchingWall)
         {
-            wallStickCounter = wallStickTime;
+            lastWallJumpDirection = 0;
         }
+    }
+    void HandleCoyoteTime()
+    {
+        if (isGrounded)
+            coyoteTimeCounter = coyoteTime;
         else
-        {
-            wallStickCounter -= Time.deltaTime;
-        }
-
-        isWallSliding = wallStickCounter > 0 && !isGrounded;
+            coyoteTimeCounter -= Time.deltaTime;
     }
 
     void HandleJump()
     {
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            if (isGrounded)
+           
+            if (isWallSliding && wallJumpCooldownTimer <= 0f)
+            {
+                int currentWallDirection = -facingDirection; // 玩家面向右 => 墙在左边，跳向右 => 方向为 -1
+
+                // 如果墙的方向和上次跳的一样，禁止跳（说明玩家还在同一面墙）
+                if (currentWallDirection != lastWallJumpDirection)
+                {
+                    rb.velocity = new Vector2(-facingDirection * moveSpeed, jumpForce);
+                    wallJumpCooldownTimer = wallJumpCooldown;
+                    isWallSliding = false;
+
+                    lastWallJumpDirection = currentWallDirection; // 记录这次跳的方向
+                }
+            }
+            // 正常跳跃
+            else if ((coyoteTimeCounter > 0f || availableJumps > 0) && wallJumpCooldownTimer <= 0f)
             {
                 rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+
+                animator.SetBool("Jump", true);
+
+                availableJumps--;
+                coyoteTimeCounter = 0;
+                lastWallJumpDirection = 0; // 普通跳跃不算墙跳，重置方向
             }
-            else if (isWallSliding)
-            {
-                rb.velocity = new Vector2(-wallDirection * moveSpeed, jumpForce);
-                wallStickCounter = 0;
-            }
+        }
+    }
+    void HandleWallSlide()
+    {
+        isWallSliding = false;
+
+        if (isTouchingWall && !isGrounded && moveInput == facingDirection)
+        {
+            isWallSliding = true;
+
+            if (rb.velocity.y < -wallSlideSpeed)
+                rb.velocity = new Vector2(rb.velocity.x, -wallSlideSpeed);
+
+            Debug.Log("正在墙滑！");
         }
     }
 
@@ -138,54 +160,39 @@ public class Playermovement : MonoBehaviour
     {
         if (moveInput > 0)
         {
-            transform.localScale = initialScale;
+            spriteRenderer.flipX = false;
+            facingDirection = 1;
+            wallCheck.localPosition = new Vector3(Mathf.Abs(wallCheck.localPosition.x), wallCheck.localPosition.y, 0);
         }
         else if (moveInput < 0)
         {
-            transform.localScale = new Vector3(-initialScale.x, initialScale.y, initialScale.z);
+            spriteRenderer.flipX = true;
+            facingDirection = -1;
+            wallCheck.localPosition = new Vector3(-Mathf.Abs(wallCheck.localPosition.x), wallCheck.localPosition.y, 0);
         }
     }
 
-    void HandleMovement()
+    void UpdateAnimator()
     {
-        if (isWallSliding)
-        {
-            moveInput = 0;
-        }
+        if (animator == null) return;
 
-        float targetVelocityX = moveInput * moveSpeed;
-        float smoothTime = (Mathf.Abs(moveInput) > 0.1f) ? 1f / acceleration : 1f / deceleration;
-        float smoothedVelocityX = Mathf.SmoothDamp(
-            rb.velocity.x,
-            targetVelocityX,
-            ref velocityXSmoothing,
-            smoothTime
-        );
-
-        rb.velocity = new Vector2(smoothedVelocityX, rb.velocity.y);
-    }
-
-    void HandleWallSlide()
-    {
-        if (isWallSliding)
-        {
-            float currentSlideSpeed = Mathf.Max(-wallSlideSpeed, rb.velocity.y);
-            rb.velocity = new Vector2(rb.velocity.x, currentSlideSpeed - wallPushForce * Time.deltaTime);
-
-            if (Mathf.Sign(moveInput) == Mathf.Sign(wallDirection))
-            {
-                rb.velocity += Vector2.down * wallPushForce * Time.deltaTime;
-            }
-        }
+        animator.SetBool("Grounded", isGrounded);
+        animator.SetFloat("Speed", Mathf.Abs(rb.velocity.x));
+        animator.SetBool("WallSlide", isWallSliding);
     }
 
     void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.green;
-        Gizmos.DrawRay(groundCheck.position, Vector2.down * groundCheckRadius);
+        if (groundCheck != null)
+        {
+            Gizmos.color = Color.green;
+            Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
+        }
 
-        Gizmos.color = Color.blue;
-        Vector2 wallDir = new Vector2(transform.localScale.x > 0 ? 1 : -1, 0);
-        Gizmos.DrawRay(transform.position, wallDir * wallCheckDistance);
+        if (wallCheck != null)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(wallCheck.position, wallCheck.position + Vector3.right * wallCheckDistance * facingDirection);
+        }
     }
 }
