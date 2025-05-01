@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0541b7d063318d84bae3f5fd9217ede8, type: 3}
-  m_Name: "1\xD71"
+  m_Name: "\u84B2\u516C\u82F1\u82B1"
   m_EditorClassIdentifier: 
-  width: 1
-  height: 1
-  itemIcon: {fileID: 21300000, guid: ba1a081f6934d034e8a1b889d58a4b99, type: 3}
+  width: 2
+  height: 2
+  itemIcon: {fileID: 21300000, guid: cd4299d4ed73df8458913572fc25c5f2, type: 3}

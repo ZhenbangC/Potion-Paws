@@ -8,15 +8,14 @@ public class Item : MonoBehaviour
 {
     public enum InteractionType { NONE, PickUp, Examine, GrabDrop }
     public enum ItemType { Static, Consumables }
+    public Sprite icon;
 
     [Header("Attributes")]
     public InteractionType interactType;
     public ItemType type;
 
-    [Header("道具名称（用于堆叠识别）")]
-    public string itemName; // 统一命名识别
-
-    public Sprite icon; // 用于UI显示
+    [Header("数据源")]
+    public itemData data;
 
     [Header("Description")]
     [TextArea(2, 5)]
@@ -45,7 +44,7 @@ public class Item : MonoBehaviour
                 InventorySystem inventorySystem = FindObjectOfType<InventorySystem>();
                 if (inventorySystem != null)
                 {
-                    inventorySystem.PickUp(this); // 改为传递Item
+                    inventorySystem.PickUp(this); // 传递当前物体
                     gameObject.SetActive(false);
                 }
                 break;
@@ -61,4 +60,13 @@ public class Item : MonoBehaviour
 
         customEvent?.Invoke();
     }
+
+    // ----------------------
+    // 属性访问器（方便 UI 调用）
+    // ----------------------
+
+    public string itemName => data != null ? data.name : "未命名";
+    public Sprite itemIcon => data != null ? data.itemIcon : null;
+    public int width => data != null ? data.width : 1;
+    public int height => data != null ? data.height : 1;
 }

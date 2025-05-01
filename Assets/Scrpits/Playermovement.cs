@@ -44,6 +44,7 @@ public class Playermovement : MonoBehaviour
     private float moveInput;
     private int facingDirection = 1;
     private int lastWallJumpDirection = 0;
+    private bool isDead = false;
 
     void Start()
     {
@@ -57,6 +58,8 @@ public class Playermovement : MonoBehaviour
     {
         if (wallJumpCooldownTimer > 0f)
             wallJumpCooldownTimer -= Time.deltaTime;
+
+        if (isDead) return;
 
         moveInput = Input.GetAxisRaw("Horizontal");
         
@@ -195,4 +198,16 @@ public class Playermovement : MonoBehaviour
             Gizmos.DrawLine(wallCheck.position, wallCheck.position + Vector3.right * wallCheckDistance * facingDirection);
         }
     }
+
+    public void Die()
+    {
+        isDead = true;
+        FindObjectOfType<LevelManager>().Restart();
+    }
+
+    public void ResetPlayer()
+    {
+        isDead = false;
+    }
+
 }
