@@ -1,9 +1,8 @@
-
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody2D), typeof(Animator), typeof(SpriteRenderer))]
 public class Playermovement : MonoBehaviour
 {
-
     [Header("移动参数")]
     public float moveSpeed = 5f;
 
@@ -24,7 +23,7 @@ public class Playermovement : MonoBehaviour
     private bool isTouchingWall;
     public LayerMask wallLayer;
 
-    [Header("墙滑相关")]
+    [Header("墙滑参数")]
     public float wallSlideSpeed = 2f;
     private bool isWallSliding;
 
@@ -32,19 +31,33 @@ public class Playermovement : MonoBehaviour
     public float coyoteTime = 0.2f;
     private float coyoteTimeCounter;
 
-    [Header("组件引用")]
+    [Header("墙跳限制")]
+    public float wallJumpCooldown = 0.3f;
+    private float wallJumpCooldownTimer = 0f;
+    private int lastWallJumpDirection = 0;
+
+    [Header("击退")]
+    public float knockbackForce = 10f;
+    public float knockbackUpwardForce = 2f;
+    public float knockbackDuration = 0.2f;
+    private bool isKnockback = false;
+    private float knockbackTimer = 0f;
+    private int knockbackDirection = 0;
+
+    [Header("脚步声")]
+    public float footstepInterval = 0.4f;
+    private float footstepTimer = 0f;
+
+    [Header("组件")]
     private Rigidbody2D rb;
     private Animator animator;
     private SpriteRenderer spriteRenderer;
 
-    [Header("墙跳限制")]
-    public float wallJumpCooldown = 0.3f;
-    private float wallJumpCooldownTimer = 0f;
-
-    private float moveInput;
+    private Vector2 respawnPoint;
     private int facingDirection = 1;
-    private int lastWallJumpDirection = 0;
+    private float moveInput;
     private bool isDead = false;
+    private bool canMove = true;
 
     void Start()
     {
@@ -52,42 +65,57 @@ public class Playermovement : MonoBehaviour
         animator = GetComponent<Animator>();
         spriteRenderer = GetComponent<SpriteRenderer>();
         availableJumps = maxJumps;
+        respawnPoint = transform.position;
     }
 
     void Update()
     {
+        if (isDead || !canMove) return;
+
+        moveInput = Input.GetAxisRaw("Horizontal");
+
         if (wallJumpCooldownTimer > 0f)
             wallJumpCooldownTimer -= Time.deltaTime;
 
-        if (isDead) return;
-
-        moveInput = Input.GetAxisRaw("Horizontal");
-        
         animator.SetFloat("yVelocity", rb.velocity.y);
 
         CheckGrounded();
         HandleCoyoteTime();
-        FlipCharacter();
         CheckWall();
         HandleWallSlide();
         HandleJump();
+        FlipCharacter();
         UpdateAnimator();
+        PlayFootstepSound();
+
+        if (isKnockback)
+        {
+            knockbackTimer -= Time.deltaTime;
+            if (knockbackTimer <= 0f)
+            {
+                isKnockback = false;
+            }
+        }
     }
 
     void FixedUpdate()
     {
-        if (!isWallSliding)
-            rb.velocity = new Vector2(moveInput * moveSpeed, rb.velocity.y);
-        else
-            rb.velocity = new Vector2(moveInput * moveSpeed * 0.5f, rb.velocity.y);
+        if (isDead || !canMove) return;
+
+        if (isKnockback)
+        {
+            rb.velocity = new Vector2(knockbackDirection * knockbackForce, rb.velocity.y);
+            return;
+        }
+
+        float speedFactor = isWallSliding ? 0.5f : 1f;
+        rb.velocity = new Vector2(moveInput * moveSpeed * speedFactor, rb.velocity.y);
     }
 
     void CheckGrounded()
     {
         isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
-        if (isGrounded)
-            availableJumps = maxJumps;
-
+        if (isGrounded) availableJumps = maxJumps;
 
         animator.SetBool("Jump", !isGrounded);
     }
@@ -95,15 +123,11 @@ public class Playermovement : MonoBehaviour
     void CheckWall()
     {
         bool wasTouchingWall = isTouchingWall;
-
         isTouchingWall = Physics2D.Raycast(wallCheck.position, Vector2.right * facingDirection, wallCheckDistance, wallLayer);
-
-        
         if (wasTouchingWall && !isTouchingWall)
-        {
             lastWallJumpDirection = 0;
-        }
     }
+
     void HandleCoyoteTime()
     {
         if (isGrounded)
@@ -112,38 +136,6 @@ public class Playermovement : MonoBehaviour
             coyoteTimeCounter -= Time.deltaTime;
     }
 
-    void HandleJump()
-    {
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-           
-            if (isWallSliding && wallJumpCooldownTimer <= 0f)
-            {
-                int currentWallDirection = -facingDirection; // 玩家面向右 => 墙在左边，跳向右 => 方向为 -1
-
-                // 如果墙的方向和上次跳的一样，禁止跳（说明玩家还在同一面墙）
-                if (currentWallDirection != lastWallJumpDirection)
-                {
-                    rb.velocity = new Vector2(-facingDirection * moveSpeed, jumpForce);
-                    wallJumpCooldownTimer = wallJumpCooldown;
-                    isWallSliding = false;
-
-                    lastWallJumpDirection = currentWallDirection; // 记录这次跳的方向
-                }
-            }
-            // 正常跳跃
-            else if ((coyoteTimeCounter > 0f || availableJumps > 0) && wallJumpCooldownTimer <= 0f)
-            {
-                rb.velocity = new Vector2(rb.velocity.x, jumpForce);
-
-                animator.SetBool("Jump", true);
-
-                availableJumps--;
-                coyoteTimeCounter = 0;
-                lastWallJumpDirection = 0; // 普通跳跃不算墙跳，重置方向
-            }
-        }
-    }
     void HandleWallSlide()
     {
         isWallSliding = false;
@@ -151,11 +143,35 @@ public class Playermovement : MonoBehaviour
         if (isTouchingWall && !isGrounded && moveInput == facingDirection)
         {
             isWallSliding = true;
-
             if (rb.velocity.y < -wallSlideSpeed)
                 rb.velocity = new Vector2(rb.velocity.x, -wallSlideSpeed);
+        }
+    }
 
-            Debug.Log("正在墙滑！");
+    void HandleJump()
+    {
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            if (isWallSliding && wallJumpCooldownTimer <= 0f)
+            {
+                int currentWallDir = -facingDirection;
+                if (currentWallDir != lastWallJumpDirection)
+                {
+                    rb.velocity = new Vector2(-facingDirection * moveSpeed, jumpForce);
+                    wallJumpCooldownTimer = wallJumpCooldown;
+                    isWallSliding = false;
+                    lastWallJumpDirection = currentWallDir;
+                    AudioManager.instance.PlaySFX("跳跃");
+                }
+            }
+            else if ((coyoteTimeCounter > 0f || availableJumps > 0) && wallJumpCooldownTimer <= 0f)
+            {
+                rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+                availableJumps--;
+                coyoteTimeCounter = 0f;
+                lastWallJumpDirection = 0;
+                AudioManager.instance.PlaySFX("跳跃");
+            }
         }
     }
 
@@ -165,49 +181,91 @@ public class Playermovement : MonoBehaviour
         {
             spriteRenderer.flipX = false;
             facingDirection = 1;
-            wallCheck.localPosition = new Vector3(Mathf.Abs(wallCheck.localPosition.x), wallCheck.localPosition.y, 0);
+            wallCheck.localPosition = new Vector3(Mathf.Abs(wallCheck.localPosition.x), wallCheck.localPosition.y);
         }
         else if (moveInput < 0)
         {
             spriteRenderer.flipX = true;
             facingDirection = -1;
-            wallCheck.localPosition = new Vector3(-Mathf.Abs(wallCheck.localPosition.x), wallCheck.localPosition.y, 0);
+            wallCheck.localPosition = new Vector3(-Mathf.Abs(wallCheck.localPosition.x), wallCheck.localPosition.y);
         }
     }
 
     void UpdateAnimator()
     {
-        if (animator == null) return;
-
         animator.SetBool("Grounded", isGrounded);
         animator.SetFloat("Speed", Mathf.Abs(rb.velocity.x));
         animator.SetBool("WallSlide", isWallSliding);
     }
 
-    void OnDrawGizmosSelected()
+    void PlayFootstepSound()
     {
-        if (groundCheck != null)
-        {
-            Gizmos.color = Color.green;
-            Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
-        }
+        bool isMoving = Mathf.Abs(moveInput) > 0.1f;
+        bool isAbleToStep = isMoving && isGrounded && !isWallSliding && !isKnockback && !isDead;
 
-        if (wallCheck != null)
+        if (isAbleToStep)
         {
-            Gizmos.color = Color.red;
-            Gizmos.DrawLine(wallCheck.position, wallCheck.position + Vector3.right * wallCheckDistance * facingDirection);
+            footstepTimer -= Time.deltaTime;
+            if (footstepTimer <= 0f)
+            {
+                AudioManager.instance.PlaySFX("脚步");
+                footstepTimer = footstepInterval;
+            }
         }
+        else
+        {
+            footstepTimer = 0f;
+        }
+    }
+
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Platform"))
+        {
+            SetRespawnPoint(transform.position);
+        }
+    }
+
+    public void TakeDamage()
+    {
+        isKnockback = true;
+        knockbackTimer = knockbackDuration;
+        knockbackDirection = -facingDirection;
+
+        AudioManager.instance.PlaySFX("受伤");
+        if (animator != null)
+            animator.SetTrigger("Hurt");
     }
 
     public void Die()
     {
         isDead = true;
+        canMove = false;
+        animator.SetTrigger("Die");
         FindObjectOfType<LevelManager>().Restart();
+    }
+
+    public void Respawn()
+    {
+        transform.position = respawnPoint;
+        rb.velocity = Vector2.zero;
+        isKnockback = false;
+        knockbackTimer = 0f;
+        knockbackDirection = 0;
+        isDead = false;
+        canMove = true;
+        animator.Rebind();
+        animator.Update(0f);
+    }
+
+    public void SetRespawnPoint(Vector2 point)
+    {
+        respawnPoint = point;
     }
 
     public void ResetPlayer()
     {
         isDead = false;
+        canMove = true;
     }
-
 }

@@ -3,38 +3,51 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-
 public class LifeCount : MonoBehaviour
 {
+    [Header("UI 显示的生命图标")]
     public Image[] lives;
-    public int livesRemaining;
 
-    //3 lives - 3 images (0,1,2,)
-    //2 lives - 2 images (0,1,[2])
-    //1 life - 1 image (0,[1],[2])
-    //0 lives - 0 images ([0,1,2]) LOSE
+    [Header("初始生命数量")]
+    public int maxLives = 3;
+    [HideInInspector] public int livesRemaining;
 
+    private void Start()
+    {
+        ResetLives(); // 初始设置
+    }
+
+    /// <summary>
+    /// 玩家失去一条命
+    /// </summary>
     public void LoseLife()
     {
-        //If no lives remaining do nothing
         if (livesRemaining == 0)
             return;
-        //Decrease the value of livesRemaining
+
         livesRemaining--;
-        //Hide one of the life images
         lives[livesRemaining].enabled = false;
 
-        //If we run out of lives we lose the game
         if (livesRemaining == 0)
         {
-            FindObjectOfType<Playermovement>().Die();
+            Playermovement player = FindObjectOfType<Playermovement>();
+            if (player != null)
+            {
+                player.Die(); // 玩家死亡触发逻辑
+            }
         }
     }
 
-    private void Update()
+    /// <summary>
+    /// 重置生命到最大值（用于复活）
+    /// </summary>
+    public void ResetLives()
     {
-        //if (Input.GetKeyDown(KeyCode.Return))
-        //    LoseLife();
-    }
+        livesRemaining = maxLives;
 
+        for (int i = 0; i < lives.Length; i++)
+        {
+            lives[i].enabled = i < maxLives; // 根据最大生命显示
+        }
+    }
 }

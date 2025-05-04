@@ -51,7 +51,13 @@ public class InventorySystem : MonoBehaviour
     {
         isOpen = !isOpen;
         ui_Window.SetActive(isOpen);
-        if (isOpen) Update_UI();
+        if (isOpen)
+        {
+         
+            AudioManager.instance.PlaySFX("±³°ü");
+
+            Update_UI();
+        }
     }
 
     public Dictionary<string, int> GetAllItems()
@@ -80,6 +86,7 @@ public class InventorySystem : MonoBehaviour
             itemNames.Add(cleanName);
             itemQuantities.Add(1);
         }
+        AudioManager.instance.PlaySFX("Ê°È¡");
 
         Update_UI();
     }

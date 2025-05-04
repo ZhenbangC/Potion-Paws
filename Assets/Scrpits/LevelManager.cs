@@ -1,26 +1,32 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class LevelManager : MonoBehaviour
 {
-    Vector2 playerInitPosition;
+    private Playermovement player;
+    private LifeCount lifeCount;
 
-    void Start()
+    private void Start()
     {
-        playerInitPosition = FindObjectOfType<Playermovement>().transform.position;
+        player = FindObjectOfType<Playermovement>();
+        lifeCount = FindObjectOfType<LifeCount>();
+
+        if (player != null)
+        {
+            // 初始出生点设为初始位置
+            player.SetRespawnPoint(player.transform.position);
+        }
     }
 
     public void Restart()
     {
-        //1- Restart the scene
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-        //2- Reset the player's position 
-        //Save the player's initial position when game starts
-        //When respawning simply reposit the player to that init position
-        //Reset the player's movement speed
-        //FindObjectOfType<Playermovement>().ResetPlayer();
-        //FindObjectOfType<Playermovement>().transform.position = playerInitPosition;
-        //Reset the life count
+        if (player != null)
+        {
+            player.Respawn(); // 将玩家传送回最近的平台
+        }
 
+        if (lifeCount != null)
+        {
+            lifeCount.ResetLives(); // 重置生命数量
+        }
     }
 }
